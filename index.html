@@ -26,43 +26,66 @@
         </el-menu>
       </el-aside>
       <el-main v-loading="loading">
-        <h3>{{ activeBucket }}</h3>
-        <el-form :model="bucketDetail" label-width="200px">
-          <el-form-item label="Name" prop="name">
-            <el-input :readonly="!canEdit" v-model="bucketDetail.name"></el-input>
-          </el-form-item>
-          <el-form-item label="ID" prop="id">
-            <el-input :readonly="!canEdit" v-model="bucketDetail.id"></el-input>
-          </el-form-item>
-          <el-form-item label="Columns" prop="columns">
-            <el-row style="margin-bottom: 10px" v-for="column in bucketDetail.columns">
-              <el-col :span="12">
-                <el-input :readonly="!canEdit" placeholder="Key" v-model="column.key"></el-input>
-              </el-col>
-              <el-col :span="12">
-                <el-input :readonly="!canEdit" placeholder="Value" v-model="column.value"></el-input>
-              </el-col>
-            </el-row>
-            <el-button type="button" @click="bucketDetail.columns.push({ key: '', value: '' })">+ Column</el-button>
-          </el-form-item>
-          <el-form-item label="Date Column" prop="date_column">
-            <el-select :readonly="!canEdit" v-model="bucketDetail.date_column" placeholder="Select column">
-              <el-option v-for="column in bucketDetail.columns" :label="`${column.key} (${column.value})`" :value="column.key"></el-option>
-            </el-select>
-          </el-form-item>
-          <el-form-item label="Index" prop="primary_keys">
-            <el-select :readonly="!canEdit" v-model="bucketDetail.primary_keys" multiple placeholder="Select column">
-              <el-option v-for="column in bucketDetail.columns" :label="`${column.key} (${column.value})`" :value="column.key"></el-option>
-            </el-select>
-          </el-form-item>
-          <el-form-item>
-            <el-button v-show="canEdit" type="primary" @click="createBucket">Create</el-button>
-            <el-button v-show="!canEdit" @click="activeBucket = null">Duplicate</el-button>
-            <el-button v-show="!canEdit" type="danger" @click="deleteBucket">Delete</el-button>
-            <el-button @click="saveBucketData">Copy</el-button>
-            <el-button @click="loadBucketData">Paste</el-button>
-          </el-form-item>
-        </el-form>
+        <template v-if="activeBucket">
+          <h3 style="margin-top: 0">{{bucketDetail.name}} ({{ activeBucket }})</h3>
+          <el-row>
+            <el-col :span="6">
+              <el-button size="small" @click="activeBucket = null">Duplicate</el-button>
+              <el-button size="small" type="danger" @click="deleteBucket">Delete</el-button>
+              <el-table size="mini" :data="bucketDetail.columns" style="width: 100%; margin-top: 10px">
+                <el-table-column prop="column" label="Key"></el-table-column>
+                <el-table-column prop="value" label="Type" width="80"></el-table-column>
+              </el-table>
+            </el-col>
+            <el-col :span="18">
+              <el-input
+                type="textarea"
+                :rows="2"
+                v-model="query"
+              ></el-input>
+              <el-button size="small" @click="doQuery">Query</el-button>
+              <el-table size="small" :data="queryResult" style="width: 100%; margin-top: 10px">
+                <el-table-column v-for="k in queryResultKeys" :prop="k" :label="k"></el-table-column>
+              </el-table>
+            </el-col>
+          </el-row>
+        </template>
+        <template v-else>
+          <el-form :model="bucketDetail" label-width="200px">
+            <el-form-item label="Name" prop="name">
+              <el-input v-model="bucketDetail.name"></el-input>
+            </el-form-item>
+            <el-form-item label="ID" prop="id">
+              <el-input v-model="bucketDetail.id"></el-input>
+            </el-form-item>
+            <el-form-item label="Columns" prop="columns">
+              <el-row style="margin-bottom: 10px" v-for="column in bucketDetail.columns">
+                <el-col :span="12">
+                  <el-input placeholder="Key" v-model="column.column"></el-input>
+                </el-col>
+                <el-col :span="12">
+                  <el-input placeholder="Value" v-model="column.value"></el-input>
+                </el-col>
+              </el-row>
+              <el-button type="button" @click="bucketDetail.columns.push({ column: '', value: '' })">+ Column</el-button>
+            </el-form-item>
+            <el-form-item label="Date Column" prop="date_column">
+              <el-select v-model="bucketDetail.date_column" placeholder="Select column">
+                <el-option v-for="column in bucketDetail.columns" :label="`${column.column} (${column.value})`" :value="column.column"></el-option>
+              </el-select>
+            </el-form-item>
+            <el-form-item label="Index" prop="primary_keys">
+              <el-select v-model="bucketDetail.primary_keys" multiple placeholder="Select column">
+                <el-option v-for="column in bucketDetail.columns" :label="`${column.column} (${column.value})`" :value="column.column"></el-option>
+              </el-select>
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" @click="createBucket">Create</el-button>
+              <el-button @click="saveBucketData">Copy</el-button>
+              <el-button @click="loadBucketData">Paste</el-button>
+            </el-form-item>
+          </el-form>
+        </template>
       </el-main>
     </el-container>
     <el-dialog title="Authorization" :visible.sync="dialogVisible" width="640px" :before-close="setAuth">
@@ -118,6 +141,8 @@
             id: '',
             token: ''
           },
+          query: '',
+          queryResult: null,
           loading: false,
           buckets: [],
           activeBucket: null,
@@ -126,8 +151,11 @@
         }
       },
       computed: {
-        canEdit () {
-          return this.activeBucket === null
+        queryResultKeys () {
+          if (!this.queryResult || !this.queryResult[0]) {
+            return []
+          }
+          return Object.keys(this.queryResult[0])
         }
       },
       mounted () {
@@ -181,7 +209,7 @@
           }
         },
         async saveBucketData() {
-          navigator.clipboard.writeText(JSON.stringify(this.bucketDetail))
+          navigator.clipboard.writeText(JSON.stringify(this.bucketDetail, null, 2))
           this.$message.success('Copied')
         },
         getBucket(id) {
@@ -197,7 +225,7 @@
             this.activeBucket = id
             this.bucketDetail = {
               name: bucket.name,
-              columns: Object.entries(bucket.structure.columns).map(([key, value]) => ({ key, value})),
+              columns: Object.entries(bucket.structure.columns).map(([column, value]) => ({ column, value })),
               date_column: bucket.structure.date_column,
               primary_keys: bucket.structure.primary_keys
             }
@@ -213,12 +241,12 @@
             name,
             id,
             structure: {
-              columns: columns.reduce((obj, { key, value }) => {
-                if (!key || !value) return obj
+              columns: columns.reduce((obj, { column, value }) => {
+                if (!column || !value) return obj
 
                 return {
                   ...obj,
-                  [key]: value
+                  [column]: value
                 }
               }, {}),
               ...rest,
@@ -239,6 +267,17 @@
             return this.listBuckets().then(() => {
               this.getBucket(null)
             })
+          }).catch(() => {}).then(() => {
+            this.loading = false
+          })
+        },
+        doQuery() {
+          if (this.loading) return
+          this.loading = true
+          axios.post(`/portal/query/${this.activeBucket}`, {
+            query: this.query,
+          }).then(res => {
+            this.queryResult = res.data.data
           }).catch(() => {}).then(() => {
             this.loading = false
           })
