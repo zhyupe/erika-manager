@@ -113,11 +113,19 @@
   <script src="https://unpkg.com/vue@2/dist/vue.js"></script>
   <script src="https://unpkg.com/element-ui/lib/index.js"></script>
   <script>
+    let axiosAuth = {}
     function setAuth(url, id, token) {
-      axios.defaults.baseURL = url;
-      axios.defaults.headers.common['X-Erika-User-Id'] = id
-      axios.defaults.headers.common['X-Erika-User-Token'] = token
+      axios.defaults.baseURL = url
+      axiosAuth = { id, token }
     }
+
+    axios.interceptors.request.use((config) => {
+      if (!config.headers['X-Erika-Query-Token']) {
+        config.headers.common['X-Erika-User-Id'] = axiosAuth.id
+        config.headers.common['X-Erika-User-Token'] = axiosAuth.token
+      }
+      return config
+    })
 
     axios.interceptors.response.use((response) => {
       return response
