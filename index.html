@@ -27,7 +27,8 @@
       </el-aside>
       <el-main v-loading="loading">
         <template v-if="activeBucket">
-          <h3 style="margin-top: 0">{{bucketDetail.name}} ({{ activeBucket }})</h3>
+          <h3 style="margin-top: 0">{{bucketDetail.name}}</h3>
+          <div style="margin-bottom: 10px;">ID: <el-tag size="small">{{ activeBucket }}</el-tag> / Query Token <el-tag size="small">{{ bucketDetail.query_token }}</el-tag></div>
           <el-row>
             <el-col :span="6">
               <el-button size="small" @click="activeBucket = null">Duplicate</el-button>
@@ -221,13 +222,14 @@
 
           this.loading = true
           axios.get(`/portal/bucket/${id}`).then(res => {
-            const bucket = res.data.data.bucket
+            const { bucket, query_token } = res.data.data
             this.activeBucket = id
             this.bucketDetail = {
               name: bucket.name,
               columns: Object.entries(bucket.structure.columns).map(([column, value]) => ({ column, value })),
               date_column: bucket.structure.date_column,
-              primary_keys: bucket.structure.primary_keys
+              primary_keys: bucket.structure.primary_keys,
+              query_token,
             }
           }).catch(() => {}).then(() => {
             this.loading = false
@@ -276,6 +278,10 @@
           this.loading = true
           axios.post(`/portal/query/${this.activeBucket}`, {
             query: this.query,
+          }, {
+            headers: {
+              'X-Erika-Query-Token': this.bucketDetail.query_token
+            }
           }).then(res => {
             this.queryResult = res.data.data
           }).catch(() => {}).then(() => {
