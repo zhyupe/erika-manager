@@ -271,6 +271,9 @@
           })
         },
         deleteBucket() {
+          const name = this.bucketDetail.name
+          if (prompt(`请输入 ${name} 确认`) != name) return
+
           if (this.loading) return
           this.loading = true
           axios.delete(`/portal/bucket/${this.activeBucket}`).then(res => {
